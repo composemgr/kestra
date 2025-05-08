@@ -1,20 +1,31 @@
+# nginx proxy address - http://172.17.0.1:59057
+
 name: kestra
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
 services:
   server:
     image: kestra/kestra:latest
     container_name: kestra-server
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
     pull_policy: always
     user: 'root'
     command: server standalone
+    logging: *default-logging
     environment:
+      TZ: ${TZ:-America/New_York}
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:
             url: jdbc:postgresql://kestra-db:5432/kestra
             driverClassName: org.postgresql.Driver
             username: kestra
-            password: k3str4
+            password: zG9Po2GyRRJa5nE9Yawtu6InYWew2W8X
         kestra:
           server:
             basic-auth:
@@ -48,12 +59,15 @@ services:
   db:
     image: postgres:latest
     container_name: kestra-db
+    hostname: kestra-db
     restart: always
     pull_policy: always
+    logging: *default-logging
     environment:
+      TZ: ${TZ:-America/New_York}
       POSTGRES_DB: kestra
       POSTGRES_USER: kestra
-      POSTGRES_PASSWORD: k3str4
+      POSTGRES_PASSWORD: zG9Po2GyRRJa5nE9Yawtu6InYWew2W8X
     expose:
       - 5432
     volumes:
