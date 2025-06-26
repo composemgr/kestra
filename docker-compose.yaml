@@ -1,0 +1,86 @@
+# nginx proxy address - http://172.17.0.1:59057
+
+name: kestra
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  server:
+    image: kestra/kestra:latest
+    container_name: kestra-server
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    user: 'root'
+    command: server standalone
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://kestra-db:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: zG9Po2GyRRJa5nE9Yawtu6InYWew2W8X
+        kestra:
+          server:
+            basic-auth:
+              enabled: true
+              password: ${APP_ADMIN_PASS:-password}
+              username: "${APP_ADMIN_PASS:-admin}@${BASE_DOMAIN_NAME:-kestra.io}"
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: "/app/storage"
+          queue:
+            type: postgres
+          tasks:
+            tmp-dir:
+              path: /tmp/kestra-wd/tmp
+          url: https://${BASE_HOST_NAME}/
+    ports:
+      - '172.17.0.1:59057:8080'
+    volumes:
+      - './rootfs/data/tmp:/tmp/kestra-wd'
+      - './rootfs/data/kestra:/app/storage'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    depends_on:
+      db:
+        condition: service_started
+    networks:
+      - kestra
+
+  db:
+    image: postgres:latest
+    container_name: kestra-db
+    hostname: kestra-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: zG9Po2GyRRJa5nE9Yawtu6InYWew2W8X
+    expose:
+      - 5432
+    volumes:
+      - './rootfs/db/postgres:/var/lib/postgresql/data'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}']
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - kestra
+
+networks:
+  keatra:
+    name: kestra
+    external: false
