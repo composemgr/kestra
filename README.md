@@ -51,9 +51,9 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/tmp` - Data storage
-- `./rootfs/data/kestra` - Data storage
-- `./rootfs/data/db/postgres/kestra` - Data storage
+- `./volumes/data/tmp` - Data storage
+- `./volumes/data/kestra` - Data storage
+- `./volumes/data/db/postgres/kestra` - Data storage
 
 ## 🔐 Security
 
