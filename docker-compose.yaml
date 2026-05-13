@@ -43,7 +43,7 @@ services:
           tasks:
             tmp-dir:
               path: /tmp/kestra-wd/tmp
-          url: https://${BASE_HOST_NAME}/
+          url: https://${BASE_HOST_NAME:-localhost}/
     ports:
       - '172.17.0.1:59057:8080'
     volumes:
