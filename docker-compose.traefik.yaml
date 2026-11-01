@@ -1,0 +1,100 @@
+name: kestra
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: kestra/kestra:latest
+    container_name: kestra-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    user: 'root'
+    command: server standalone
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kestra-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://kestra-db:5432/${DB_CREATE_DATABASE_NAME:-kestra}
+            driverClassName: org.postgresql.Driver
+            username: ${DB_USER_NAME:-kestra}
+            password: ${DB_USER_PASS:-replace-with-a-random-password}
+        kestra:
+          server:
+            basic-auth:
+              enabled: true
+              username: ${APP_ADMIN_USER:-admin}
+              password: ${APP_ADMIN_PASS:-replace-with-a-random-password}
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              base-path: /app/storage
+          queue:
+            type: postgres
+          tasks:
+            tmp-dir:
+              path: /tmp/kestra-wd/tmp
+          url: https://${BASE_HOST_NAME:-$HOSTNAME}/
+    volumes:
+      - './volumes/data/tmp:/tmp/kestra-wd:z'
+      - './volumes/data/kestra:/app/storage:z'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.kestra-app.entrypoints=http'
+      - 'traefik.http.routers.kestra-app.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.kestra-app.middlewares=kestra-app-https-redirect'
+      - 'traefik.http.middlewares.kestra-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.kestra-app-secure.entrypoints=https'
+      - 'traefik.http.routers.kestra-app-secure.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.kestra-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.kestra-app-secure.service=kestra-app'
+      - 'traefik.http.services.kestra-app.loadbalancer.server.port=8080'
+    networks:
+      - kestra
+      - traefik
+
+  db:
+    image: postgres:alpine
+    container_name: kestra-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: kestra-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kestra-db
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-kestra}
+      POSTGRES_USER: ${DB_USER_NAME:-kestra}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+    volumes:
+      - './volumes/db/postgres/kestra:/var/lib/postgresql/data:z'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER_NAME:-kestra} -d ${DB_CREATE_DATABASE_NAME:-kestra}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kestra
+
+networks:
+  kestra:
+    name: kestra
+    external: false
+  traefik:
+    external: true
